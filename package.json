@@ -19,6 +19,11 @@
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > packages/database/src/database.types.ts",
     "db:inspect": "node --env-file=apps/web/.env.local scripts/db-inspect.mjs",
+    "pg:up": "node scripts/db-env.mjs && docker compose up -d --wait",
+    "pg:down": "docker compose down",
+    "pg:init": "node scripts/db-init.mjs",
+    "pg:verify": "node scripts/verify-db-roles.mjs",
+    "pg:status": "docker compose ps",
     "screenshots": "node --env-file=apps/web/.env.local scripts/capture-screenshots.mjs",
     "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
   },

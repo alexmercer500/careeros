@@ -1,0 +1,54 @@
+name: careeros
+
+# Local-first PostgreSQL for CareerOS.
+#
+# Deliberately plain: one service, one named volume, loopback-only port binding.
+# No Redis, no cloud service, no public exposure.
+#
+# Never run `docker compose down -v` against this project: it destroys the
+# careeros_pgdata volume. `docker compose down` (without -v) is safe and is what
+# the persistence test uses.
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: careeros_postgres
+    restart: unless-stopped
+    shm_size: 256mb
+
+    environment:
+      POSTGRES_DB: careeros
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?POSTGRES_ADMIN_PASSWORD must be set in .env}
+      # A subdirectory avoids issues with volume mount points that contain
+      # foreign files (e.g. lost+found) on some hosts.
+      PGDATA: /var/lib/postgresql/data/pgdata
+
+    ports:
+      # Loopback only. The database is never reachable from the network.
+      - "127.0.0.1:${CAREEROS_PG_PORT:-5432}:5432"
+
+    volumes:
+      - careeros_pgdata:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d careeros"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+
+    security_opt:
+      - no-new-privileges:true
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  careeros_pgdata:
+    # Explicit name so it is never confused with the Supabase, hikkari or
+    # my-turborepo volumes that already exist on this machine.
+    name: careeros_pgdata

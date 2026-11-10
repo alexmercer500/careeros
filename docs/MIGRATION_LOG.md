@@ -126,3 +126,157 @@ error lines: 0
 
 The verification container `careeros_verify_pg` was removed after the checks. No Docker volume was
 created for it. `supabase_db_careeros` and its volumes remain untouched and running.
+
+---
+
+## Stage 2 — Local PostgreSQL and role model
+
+**Date:** 2026-11-10
+**Status:** ✅ Complete — 26/26 acceptance checks pass
+**Scope:** local PostgreSQL 17 container, persistent volume, port preflight, three-role separation,
+permission assertions, persistence across container recreation.
+
+### 1. Compose configuration
+
+`docker-compose.yml` (project `careeros`):
+
+- image `postgres:17-alpine` → server reports **17.11**, matching the source major version
+- container `careeros_postgres`, `restart: unless-stopped`, `no-new-privileges`, 256 MB `shm`
+- `POSTGRES_DB=careeros`, `POSTGRES_USER=postgres` (bootstrap superuser only)
+- `PGDATA=/var/lib/postgresql/data/pgdata` (subdirectory inside the mount)
+- port binding `127.0.0.1:${CAREEROS_PG_PORT:-5432}:5432` — **loopback only**
+- named volume `careeros_pgdata`, explicitly named so it cannot be confused with the existing
+  Supabase, `hikkari-*`, `docker_postgres_data` or `my-turborepo_*` volumes
+- healthcheck `pg_isready`, 5 s interval, 12 retries, 15 s start period
+- log rotation 10 MB × 3
+
+### 2. Port preflight
+
+`scripts/db-env.mjs` runs before compose:
+
+1. If `careeros_postgres` is already running, reuse its published port (restart-safe).
+2. Otherwise try to bind `127.0.0.1:5432`; if taken, try `127.0.0.1:55432`.
+3. Persist the choice as `CAREEROS_PG_PORT` in `.env`.
+4. Fail with a clear message if neither port is free.
+
+Result on this host:
+
+```json
+{ "envFile": "created", "generatedSecrets": [3], "port": 5432, "fallbackUsed": false }
+```
+
+Ports 54321/54322 (Supabase) and 15432/6379/6432 (unrelated stacks) are unaffected.
+
+### 3. Role model
+
+Created idempotently by `scripts/db-init.mjs` using the bootstrap superuser, then never used again.
+
+| Role | Login | Attributes | Purpose |
+|---|---|---|---|
+| `careeros_owner` | yes | `NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS NOREPLICATION` | owns the database and schema; migrations/DDL only |
+| `careeros_app` | yes | same, plus `NOINHERIT`, `CONNECTION LIMIT 20` | the only runtime login; must `SET ROLE` for tenant queries |
+| `careeros_authenticated` | no | `NOLOGIN` | policy target assumed inside tenant transactions |
+
+Supporting grants:
+
+- `grant careeros_authenticated to careeros_app`
+- `alter database careeros owner to careeros_owner`
+- `revoke create on database careeros from public`
+- `grant usage on schema public to careeros_app, careeros_authenticated`
+- default privileges for `careeros_owner` in `public`: DML on future tables, usage/select on
+  sequences, execute on functions → granted to `careeros_authenticated`
+
+The runtime role receives **no** direct table privileges; everything flows through the policy role.
+
+### 4. Permission and security verification
+
+`scripts/verify-db-roles.mjs` → **26/26 passed**:
+
+```
+PASS  container health is 'healthy'                                 healthy
+PASS  postgres is bound to loopback only                            host=127.0.0.1 port=5432
+PASS  published port matches .env                                   binding=5432 env=5432
+PASS  persistent volume careeros_pgdata exists
+PASS  careeros_owner is not a superuser                             rolsuper=false
+PASS  careeros_owner cannot bypass RLS                              rolbypassrls=false
+PASS  careeros_app logs in                                          rolcanlogin=true
+PASS  careeros_app is not a superuser                               rolsuper=false
+PASS  careeros_app cannot bypass RLS                                rolbypassrls=false
+PASS  careeros_app cannot create databases or roles                 createdb=false createrole=false
+PASS  careeros_app does not inherit privileges (SET ROLE required)  rolinherit=false
+PASS  careeros_authenticated cannot log in                          rolcanlogin=false
+PASS  migration role owns the database                              owner=careeros_owner
+PASS  runtime role owns no relations                                relations=0
+PASS  runtime role is a member of the policy role only              authenticated=true owner=false
+PASS  migration credentials can run DDL
+PASS  runtime role cannot create tables                             sqlstate 42501
+PASS  runtime role cannot create schemas                            sqlstate 42501
+PASS  runtime role cannot create roles                              sqlstate 42501
+PASS  runtime role cannot create databases                          sqlstate 42501
+PASS  runtime role cannot alter the database                        sqlstate 42501
+PASS  runtime role cannot escalate to the migration role            sqlstate 42501
+PASS  runtime role has no CREATE on schema public                   can_create=false
+PASS  RLS hides rows from a policy-less table                       rows_visible=0
+PASS  runtime role cannot read tenant tables without SET ROLE       sqlstate 42501
+PASS  runtime cannot switch row_security off                        sqlstate 42501
+```
+
+The RLS probes use a temporary policy-less table: the owner inserts and can see the row, the runtime
+sees **0 rows** through the policy role, and `set row_security = off` is rejected with `42501`. The
+probe schema was dropped afterwards.
+
+### 5. Persistence test
+
+| Step | Result |
+|---|---|
+| Write marker row as `careeros_owner` | 1 row |
+| `docker compose restart postgres` → read | **1 row**, same timestamp |
+| `docker compose down` (**no `-v`**) | container removed, volume `careeros_pgdata` still present |
+| `docker compose up -d --wait` | new container id (`740ee7324002` → `36e44d85b9f7`) |
+| Read after recreation | **1 row**, same timestamp `2026-11-10 19:04:31.521+00` |
+| Re-run `pnpm pg:verify` after recreation | **26/26 passed** (roles survived) |
+
+`docker compose down -v` was never executed. The probe table was dropped after the test.
+
+### 6. Container health
+
+```
+status=running health=healthy restarts=0 image=postgres:17-alpine server=17.11
+```
+
+### 7. Credential handling
+
+- `.env` is created by the preflight script with 3 generated 32-character secrets.
+- `git check-ignore .env` → ignored by `.gitignore:14`.
+- No `.env` or `.env.local` file is tracked (`git ls-files` → 0).
+- Every generated password value was searched across tracked files with `git grep -F` → **0 leaks**.
+- `.env.example` contains placeholders only.
+
+### 8. Files
+
+| File | Change |
+|---|---|
+| `docker-compose.yml` | new |
+| `scripts/db-env.mjs` | new — port preflight + env bootstrap |
+| `scripts/db-init.mjs` | new — idempotent role creation |
+| `scripts/verify-db-roles.mjs` | new — 26 acceptance checks |
+| `scripts/db-persistence.mjs` | new — persistence probe |
+| `package.json` | `pg:up`, `pg:down`, `pg:init`, `pg:verify`, `pg:status` |
+| `.env.example` | documents the infrastructure secrets and script behaviour |
+| `.env` | generated locally, **git-ignored, not committed** |
+
+### Acceptance criteria
+
+| Criterion | Result |
+|---|---|
+| PostgreSQL 17 in use | ✅ 17.11 |
+| Dedicated named volume | ✅ `careeros_pgdata` |
+| Loopback-only binding | ✅ `127.0.0.1:5432` |
+| Port preflight with fallback | ✅ 5432 chosen, 55432 implemented |
+| Runtime role has no DDL/ownership | ✅ assertions pass |
+| Runtime role cannot bypass RLS | ✅ attribute + behavioural probes |
+| Migration and runtime credentials separate | ✅ distinct roles and passwords |
+| Data survives restart and recreation | ✅ identical row and timestamp |
+| Supabase untouched | ✅ data intact, volumes untouched |
+| No credentials in Git | ✅ 0 leaks |
+
