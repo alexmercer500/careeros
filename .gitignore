@@ -39,6 +39,11 @@ build/
 *.log
 *.png.tmp
 
+# ------------------------------------------------------- local runtime data
+# Database dumps and local file/document storage never belong in Git.
+backups/
+var/
+
 # ------------------------------------------------------------------------ os
 .DS_Store
 Thumbs.db
