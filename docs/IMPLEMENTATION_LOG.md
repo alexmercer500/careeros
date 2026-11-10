@@ -5,6 +5,117 @@ after any notable change, per Part 13 of the master specification.
 
 ---
 
+## 2026-11-10 — Phase 1: Foundation
+
+**Status:** Complete, stopped for review. Phase 2 not started.
+**Approval basis:** Phase 0 conditionally approved with decisions — local Docker Supabase,
+passwordless magic-link auth, no TokenHarbor usage, Phase 1 tables only.
+
+### Actions taken
+
+1. Initialised git (`main`) and committed the untouched spec + Phase 0 docs as the baseline commit.
+2. Installed the Supabase CLI 3.1.0 via npm (supported Windows method); ran `supabase init`.
+3. Configured `supabase/config.toml`: `site_url = http://localhost:3001`, `/auth/confirm` redirect
+   allow-list, custom `magic_link` email template directory.
+4. Started the local stack (12 containers) without touching the existing `hikkari-*` stack.
+5. Scaffolded a pnpm workspace: `apps/web` + `packages/{validation,database,core,ai}`.
+6. Pinned TypeScript 5.9.3; ESLint 10 flat config; Vitest 5; strict base tsconfig.
+7. Built the Next.js 16 app shell, auth flow, dashboard, and profile CRUD.
+8. Wrote the Phase 1 migration (4 tables, RLS, signup trigger, helper functions, grants).
+9. Generated typed database definitions; wrote an RLS integration suite with two real users.
+10. Implemented the AI provider abstraction (OpenAI-compatible, mock, fixture, model registry) with
+    19 unit tests. No network calls, no provider credentialed.
+11. Drove the real sign-in flow with Playwright and captured 7 screenshots.
+
+### Errors encountered and fixed
+
+| Error | Fix |
+|---|---|
+| Repository packages failed `tsc` — `./server` from `src/repositories/` | Corrected to `../server`, `../types` |
+| Vitest mock typing (`mock.calls` vs untyped `vi.fn`) | Captured call arguments in a typed array |
+| Middleware matcher rejected: "source must start with /" | Restored the leading `/` in the matcher |
+| App returned 500 on all routes | Next reads env from `apps/web/.env.local`, not the repo root; moved the file and updated test/script paths |
+| No magic-link email found | `enable_confirmations = true` made Supabase send the *signup confirmation* template; set it to `false` for the passwordless flow and added `code` exchange support as well |
+| Playwright browser missing (`chromium_headless_shell-1254`) | `playwright install chromium` timed out; launched with `channel: "chromium"` |
+| Lint: Node globals undefined in `scripts/*.mjs` | Scoped Node globals to JS files in the flat config |
+| Lint: unused catch binding, untyped mock | Fixed rather than suppressed |
+| Next 16 deprecation: `middleware` | Migrated to `proxy.ts` |
+| Console 404 on every page | Added `app/icon.svg` (favicon) |
+| Ugly workspace name from email local-part | Changed the trigger fallback to "Personal workspace"; amended migration 0001 pre-release |
+| Dev overlay visible in screenshots | `devIndicators: false` |
+
+### Files created
+
+51 source/config files (see `docs/PHASE1_REPORT.md` §2). Highlights:
+
+- `apps/web/**` — 24 source files + 4 config files
+- `packages/{validation,database,core,ai}/**` — 20 files
+- `supabase/migrations/0001_phase1_foundation.sql`, `supabase/templates/magic_link.html`,
+  `supabase/seed.sql`, `supabase/config.toml`
+- `tests/integration/rls.test.ts`
+- `scripts/db-inspect.mjs`, `scripts/capture-screenshots.mjs`
+- `README.md`, `docs/PHASE1_REPORT.md`, `docs/screenshots/*`
+
+### Files modified
+
+None outside Phase 1 additions. The master spec and Phase 0 documents are unchanged from the
+baseline commit.
+
+### Features implemented
+
+- Passwordless sign-in with server-side token verification and session cookies.
+- Automatic provisioning of user + personal workspace + owner membership + empty profile.
+- Authenticated app shell with all eight navigation destinations; six are labelled placeholders.
+- Career profile read/update (13 fields) with Zod validation, field-level errors, and persistence.
+- Profile completeness computed server-side from real data.
+- Workspace-scoped access enforced by RLS, with no service-role client in the web app.
+- AI provider abstraction with deterministic mock and recorded-fixture providers.
+- Scripted end-to-end verification and screenshots.
+
+### Database changes
+
+`supabase/migrations/0001_phase1_foundation.sql`:
+
+- `workspace_role` enum.
+- Tables: `users`, `workspaces`, `workspace_members`, `career_profiles`.
+- `career_profiles (id, workspace_id)` unique key, ready for later composite foreign keys.
+- `is_workspace_member()`, `workspace_role_of()` (security definer, stable).
+- `handle_new_user()` signup trigger on `auth.users`.
+- RLS enabled on all four tables; 12 policies total.
+- Explicit grants to `authenticated` and `service_role`.
+
+No later-phase tables were created.
+
+### Tests executed
+
+| Suite | Tests | Result |
+|---|---|---|
+| `tests/integration/rls.test.ts` | 11 | pass |
+| `packages/ai/src/providers.test.ts` | 19 | pass |
+| `packages/core/src/profile/completeness.test.ts` | 4 | pass |
+| **Total** | **34** | **pass** |
+
+Commands: `pnpm typecheck` (pass, 6 projects), `pnpm lint` (pass, 0 errors/warnings),
+`pnpm build` (pass, 16 routes), `pnpm screenshots` (0 console errors).
+
+### Known issues
+
+See `docs/PHASE1_REPORT.md` §13 — notably: workspace rename not available, single workspace UI,
+no application rate limiting, no CI remote, Playwright headless-shell not installed.
+
+### Outstanding work
+
+- Owner review of Phase 1.
+- Phase 2 inputs: real employment facts and which metrics have evidence.
+- Phase 2 implementation per `docs/ROADMAP.md`.
+
+### Recommended next milestone
+
+Phase 2 — Career profile: employment records, projects, skills, education, certifications,
+achievements with verification states, positioning profiles, resume parsing into proposed facts.
+
+---
+
 ## 2026-11-10 — Phase 0: Environment audit and architecture
 
 **Status:** Complete, awaiting owner approval. No application code written.

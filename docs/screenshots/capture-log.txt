@@ -1,0 +1,5 @@
+email: careeros-demo-1794315489391@example.test
+landing path: /login
+post-verification path: /overview
+persisted full name: Ratnesh Sahu
+console errors: 0

@@ -22,6 +22,18 @@
 
 ## 2. Runtime dependencies
 
+### 2.0 As installed in Phase 1
+
+The Phase 1 install differs from the recommendations below in three places, deliberately:
+
+| Recommendation | Phase 1 reality | Why |
+|---|---|---|
+| `ai` + `@ai-sdk/openai` | **not installed** — the adapter is dependency-free `fetch` | No AI call is permitted in Phase 1, and the provider contract stays swappable. The SDK can be added behind the same interface in Phase 3 without changing callers |
+| `@tanstack/react-table`, `zustand`, `@hookform/resolvers` | **not installed** | No tables, no shared client state, and Zod validates on submit. Installing unused packages would be scaffolding |
+| `turbo` | **not installed** | One deployable; the spec defers Turborepo until multiple applications exist |
+
+`playwright@1.65.0` was added at the root for the scripted end-to-end verification and screenshots.
+
 ### 2.1 Web application (`apps/web`)
 
 | Package | Verified latest | Proposed pin | Purpose | Risk |

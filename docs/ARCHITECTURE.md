@@ -214,6 +214,20 @@ careeros/
 The spec's instruction "do not create empty modules solely to match the folder tree" is honoured:
 directories are created when their first real file lands, not up front as placeholders.
 
+### 5.1 As built in Phase 1
+
+| Proposed | Built | Why |
+|---|---|---|
+| `packages/{validation,database,core,ai}` | all four, with real code | Matches the layering rules in §4 |
+| `packages/shared-types`, `packages/config` | **not created** | Types derive from Zod and generated DB types; config lives at the repo root. Creating them now would be empty scaffolding |
+| `apps/workers` | **not created** | Phase 5; no worker exists yet |
+| `middleware.ts` | `apps/web/src/proxy.ts` | Next.js 16 renamed the convention; using the old name emits a deprecation warning |
+| `.env` at repo root | `apps/web/.env.local` | Next.js only reads env files from the app directory |
+| Turborepo | **deferred** | One deployable today; the spec itself says to add Turborepo when multiple deployables exist. `pnpm -r` is sufficient |
+
+No service-role client module exists at all in Phase 1 — provisioning happens inside a
+`security definer` database trigger, so the web app cannot leak a privileged key.
+
 ---
 
 ## 6. Data access strategy
