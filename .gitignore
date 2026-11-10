@@ -1,0 +1,45 @@
+# ---------------------------------------------------------------- dependencies
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+
+# ---------------------------------------------------------------------- next.js
+.next/
+out/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# --------------------------------------------------------------- environment
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+!.env.example
+
+# ----------------------------------------------------------------- supabase
+# Local CLI working state only. supabase/config.toml IS committed (portability).
+supabase/.branches/
+supabase/.temp/
+supabase/.env
+supabase/.env.*
+
+# --------------------------------------------------------------------- tests
+coverage/
+test-results/
+playwright-report/
+blob-report/
+*.lcov
+
+# ------------------------------------------------------------------ artifacts
+.turbo/
+dist/
+build/
+*.log
+*.png.tmp
+
+# ------------------------------------------------------------------------ os
+.DS_Store
+Thumbs.db
+desktop.ini
