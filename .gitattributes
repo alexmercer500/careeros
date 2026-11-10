@@ -1,0 +1,14 @@
+# Normalise text files to LF so the repository behaves the same on Windows and Linux.
+* text=auto eol=lf
+
+# Binaries must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Generated files
+pnpm-lock.yaml linguist-generated=true
+packages/database/src/database.types.ts linguist-generated=true
