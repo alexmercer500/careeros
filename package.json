@@ -1,0 +1,36 @@
+{
+  "name": "careeros",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.4.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @careeros/web dev",
+    "build": "pnpm --filter @careeros/web build",
+    "start": "pnpm --filter @careeros/web start",
+    "typecheck": "pnpm -r --if-present run typecheck && tsc -p tsconfig.tests.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:reset": "supabase db reset",
+    "db:types": "supabase gen types typescript --local > packages/database/src/database.types.ts",
+    "db:inspect": "node --env-file=apps/web/.env.local scripts/db-inspect.mjs",
+    "screenshots": "node --env-file=apps/web/.env.local scripts/capture-screenshots.mjs",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "eslint": "10.14.0",
+    "pg": "8.23.1",
+    "playwright": "1.65.0",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.72.2",
+    "vitest": "5.1.0"
+  }
+}

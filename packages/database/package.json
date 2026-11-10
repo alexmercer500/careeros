@@ -1,0 +1,19 @@
+{
+  "name": "@careeros/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.119.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
