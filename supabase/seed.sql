@@ -1,0 +1,9 @@
+-- ============================================================================
+-- CareerOS seed
+--
+-- Intentionally empty of business data.
+--
+-- No employment history, employers, dates, metrics, or achievements are seeded:
+-- professional facts must be entered and verified by the user (Phase 2). Seeding
+-- them would violate the project rule against fabricated professional data.
+-- ============================================================================
